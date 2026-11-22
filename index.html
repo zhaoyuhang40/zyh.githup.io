@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>MD3 Browser Ultra</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" rel="stylesheet">
+
+    <style>
+        /* --- 1. 核心变量与系统级配置 --- */
+        :root {
+            /* 默认主题色 (紫色) */
+            --app-primary: #6750A4;
+            --app-on-primary: #FFFFFF;
+            --app-container: #EADDFF;
+            --app-on-container: #21005D;
+            
+            /* 亮色模式基底 */
+            --sys-bg: #fdfcff;
+            --sys-surface: rgba(255, 255, 255, 0.85);
+            --sys-surface-variant: #E7E0EC;
+            --sys-text: #1C1B1F;
+            --sys-text-sub: #49454F;
+            --sys-outline: #79747E;
+            
+            /* 尺寸与特效 */
+            --radius-pill: 999px;
+            --radius-card: 28px;
+            --radius-btn: 16px;
+            --safe-top: env(safe-area-inset-top, 20px); /* 适配刘海屏 */
+            --safe-bottom: env(safe-area-inset-bottom, 20px);
+            
+            --glass-filter: blur(16px) saturate(180%);
+            --transition-curve: cubic-bezier(0.2, 0.0, 0, 1.0); /* 顺滑曲线 */
+        }
+
+        /* 暗黑模式变量覆盖 */
+        body.dark-mode {
+            --sys-bg: #141218;
+            --sys-surface: rgba(30, 30, 30, 0.85);
+            --sys-surface-variant: #49454F;
+            --sys-text: #E6E1E5;
+            --sys-text-sub: #CAC4D0;
+            --sys-outline: #938F99;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; /* 禁止选中文本 */ }
+
+        body {
+            margin: 0;
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--sys-bg);
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            color: var(--sys-text);
+            height: 100dvh;
+            width: 100vw;
+            overflow: hidden;
+            transition: background-image 0.5s ease;
+        }
+
+        /* 隐藏滚动条 */
+        ::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+        /* 通用特效类 */
+        .glass {
+            background: var(--sys-surface);
+            backdrop-filter: var(--glass-filter);
+            -webkit-backdrop-filter: var(--glass-filter);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .ripple-btn {
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .ripple-btn:active { transform: scale(0.92); opacity: 0.8; }
+
+        /* --- 2. 页面管理器 --- */
+        .screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column;
+            transition: transform 0.4s var(--transition-curve), opacity 0.3s;
+            z-index: 1;
+            background: transparent; /* 允许透视壁纸 */
+        }
+
+        .screen.hidden { opacity: 0; pointer-events: none; z-index: 0; }
+        
+        /* 浏览器页面从底部滑入 */
+        #browser-screen {
+            background: var(--sys-bg); /* 浏览器页面要有实底 */
+            transform: translateY(100%);
+            z-index: 20;
+        }
+        #browser-screen.active { transform: translateY(0); opacity: 1; }
+
+        /* --- 3. 首页 (Launcher) --- */
+        #home-screen { padding: calc(var(--safe-top) + 20px) 20px 20px; }
+
+        .header-row { display: flex; justify-content: flex-end; margin-bottom: 40px; }
+        
+        .settings-btn {
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            border: none;
+            color: var(--sys-text);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px;
+        }
+
+        .brand-hero {
+            text-align: center;
+            margin-bottom: 30px;
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        .app-logo {
+            font-size: 72px;
+            color: var(--app-primary);
+            background: var(--sys-surface);
+            border-radius: 32px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .greeting { font-size: 28px; font-weight: 500; margin-bottom: 5px; }
+        .date-text { font-size: 14px; color: var(--sys-text-sub); text-transform: uppercase; letter-spacing: 1px; }
+
+        /* 搜索胶囊 */
+        .search-pill {
+            width: 100%; max-width: 400px; height: 56px;
+            border-radius: var(--radius-pill);
+            display: flex; align-items: center;
+            padding: 0 20px;
+            margin: 0 auto 40px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            transition: box-shadow 0.3s;
+        }
+        .search-pill:focus-within { box-shadow: 0 8px 30px rgba(0,0,0,0.15); border: 1px solid var(--app-primary); }
+        
+        .search-input {
+            flex: 1; height: 100%; border: none; background: transparent;
+            font-size: 16px; color: var(--sys-text); margin-left: 10px; outline: none; user-select: text;
+        }
+
+        /* 快捷图标网格 */
+        .shortcuts-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+            width: 100%; max-width: 400px; margin: 0 auto;
+        }
+        .shortcut-item {
+            display: flex; flex-direction: column; align-items: center; gap: 8px;
+        }
+        .shortcut-icon {
+            width: 56px; height: 56px; border-radius: 20px;
+            background: var(--sys-surface);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 28px; color: var(--app-primary);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+        .shortcut-label { font-size: 12px; color: var(--sys-text-sub); }
+
+        /* --- 4. 设置面板 (Bottom Sheet) --- */
+        .overlay-dim {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); opacity: 0; pointer-events: none;
+            transition: opacity 0.3s; z-index: 90;
+        }
+        .overlay-dim.active { opacity: 1; pointer-events: auto; }
+
+        .bottom-sheet {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background: var(--sys-surface); /* 这里不使用透明度太高，防止看不清 */
+            background-color: var(--sys-bg); /* 兜底 */
+            border-top-left-radius: 28px; border-top-right-radius: 28px;
+            padding: 30px 24px 50px;
+            transform: translateY(100%);
+            transition: transform 0.3s var(--transition-curve);
+            z-index: 100;
+            box-shadow: 0 -5px 30px rgba(0,0,0,0.15);
+            max-height: 80vh; overflow-y: auto;
+       }
+        .bottom-sheet.active { transform: translateY(0); }
+
+        .sheet-handle {
+            width: 40px; height: 4px; background: var(--sys-outline);
+            border-radius: 2px; margin: -10px auto 20px; opacity: 0.4;
+        }
+
+        .setting-group { margin-bottom: 24px; }
+        .setting-title { font-size: 14px; font-weight: 700; color: var(--app-primary); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;}
+
+        /* 颜色选择器 */
+        .color-options { display: flex; gap: 12px; }
+        .color-circle {
+            width: 40px; height: 40px; border-radius: 50%; border: 2px solid transparent;
+            cursor: pointer;
+        }
+        .color-circle.selected { border-color: var(--sys-text); transform: scale(1.1); }
+
+        /* 开关 Toggle */
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .switch {
+            position: relative; display: inline-block; width: 50px; height: 28px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--sys-surface-variant); border-radius: 34px; transition: .4s;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px;
+            background-color: var(--sys-outline); border-radius: 50%; transition: .4s;
+        }
+        input:checked + .slider { background-color: var(--app-primary); }
+        input:checked + .slider:before { transform: translateX(22px); background-color: #fff; }
+
+        /* 通用按钮 */
+        .full-btn {
+            width: 100%; padding: 14px; border-radius: 14px; border: none;
+            background: var(--app-container); color: var(--app-on-container);
+            font-weight: 600; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+
+        /* --- 5. 浏览器内页 UI --- */
+        .browser-top {
+            height: 60px; padding: 0 16px; display: flex; align-items: center; gap: 10px;
+            border-bottom: 1px solid rgba(0,0,0,0.05); margin-top: var(--safe-top);
+        }
+        
+        .url-bar-ro {
+            flex: 1; height: 36px; background: var(--sys-surface-variant);
+            border-radius: 12px; display: flex; align-items: center; justify-content: center;
+            font-size: 13px; color: var(--sys-text); gap: 6px;
+        }
+
+        .browser-content { flex: 1; position: relative; background: #fff; }
+        .loading-line {
+            position: absolute; top: 0; left: 0; width: 0%; height: 3px;
+            background: var(--app-primary); z-index: 5; transition: width 0.2s;
+        }
+
+        .browser-bottom {
+            height: calc(60px + var(--safe-bottom)); padding-bottom: var(--safe-bottom);
+            display: flex; justify-content: space-around; align-items: center;
+            border-top: 1px solid rgba(0,0,0,0.05);
+            background: var(--sys-surface);
+        }
+        
+        .nav-icon {
+            font-size: 26px; color: var(--sys-text); padding: 10px; border-radius: 50%;
+            background: transparent; border: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- 背景遮罩 -->
+    <div id="overlay" class="overlay-dim" onclick="closeSettings()"></div>
+
+    <!-- 1. 主屏幕 (Launcher) -->
+    <div id="home-screen" class="screen">
+        <div class="header-row">
+            <button class="settings-btn glass ripple-btn" onclick="openSettings()">
+                <span class="material-symbols-rounded">tune</span>
+            </button>
+        </div>
+
+        <div class="brand-hero">
+            <div class="app-logo glass">
+                <span class="material-symbols-rounded" style="font-size: 48px;">explore</span>
+            </div>
+            <div class="greeting" id="greeting-text">Good Morning</div>
+            <div class="date-text" id="date-text">Monday, Jan 01</div>
+        </div>
+
+        <!-- 搜索 -->
+        <div class="search-pill glass">
+            <span class="material-symbols-rounded" style="color: var(--sys-outline);">search</span>
+            <input type="text" id="home-input" class="search-input" placeholder="搜索或输入网址..." autocomplete="off">
+            <button class="settings-btn ripple-btn" style="width:36px; height:36px; background:var(--app-primary); color:#fff;" id="home-go">
+                <span class="material-symbols-rounded" style="font-size:20px;">arrow_forward</span>
+            </button>
+        </div>
+
+        <!-- 快捷图标 (类似 Chrome 首页) -->
+        <div class="shortcuts-grid">
+            <div class="shortcut-item ripple-btn" onclick="loadUrl('https://cn.bing.com')">
+                <div class="shortcut-icon glass"><span class="material-symbols-rounded">search</span></div>
+                <span class="shortcut-label">Bing</span>
+            </div>
+            <div class="shortcut-item ripple-btn" onclick="loadUrl('https://m.wikipedia.org')">
+                <div class="shortcut-icon glass"><span class="material-symbols-rounded">menu_book</span></div>
+                <span class="shortcut-label">Wiki</span>
+            </div>
+            <div class="shortcut-item ripple-btn" onclick="loadUrl('https://www.bilibili.com')">
+                <div class="shortcut-icon glass"><span class="material-symbols-rounded">smart_display</span></div>
+                <span class="shortcut-label">Bilibili</span>
+            </div>
+            <div class="shortcut-item ripple-btn" onclick="loadUrl('https://github.com')">
+                <div class="shortcut-icon glass"><span class="material-symbols-rounded">code</span></div>
+                <span class="shortcut-label">Github</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 设置面板 (Bottom Sheet) -->
+    <div id="settings-sheet" class="bottom-sheet">
+        <div class="sheet-handle"></div>
+        
+        <div class="setting-group">
+            <div class="setting-title">外观风格</div>
+            <div class="toggle-row">
+                <span>暗黑模式 (Dark Mode)</span>
+                <label class="switch">
+                    <input type="checkbox" id="dark-mode-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <div style="margin-top: 15px;">主题强调色</div>
+            <div class="color-options" style="margin-top: 10px;">
+                <div class="color-circle" style="background:#6750A4" onclick="setTheme('#6750A4', this)"></div> <!-- 紫 -->
+                <div class="color-circle" style="background:#005AC1" onclick="setTheme('#005AC1', this)"></div> <!-- 蓝 -->
+                <div class="color-circle" style="background:#006D31" onclick="setTheme('#006D31', this)"></div> <!-- 绿 -->
+                <div class="color-circle" style="background:#984061" onclick="setTheme('#984061', this)"></div> <!-- 红 -->
+                <div class="color-circle" style="background:#825500" onclick="setTheme('#825500', this)"></div> <!-- 橙 -->
+                  </div>
+        </div>
+
+        <div class="setting-group">
+            <div class="setting-title">壁纸设置</div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <button class="full-btn ripple-btn" onclick="setBg('bing')">
+                    <span class="material-symbols-rounded">wallpaper</span> 每日必应
+                </button>
+                <button class="full-btn ripple-btn" onclick="setBg('none')" style="background:var(--sys-surface-variant); color:var(--sys-text);">
+                    <span class="material-symbols-rounded">block</span> 默认纯色
+                </button>
+            </div>
+            <input type="text" id="custom-bg-input" class="search-input" 
+                   style="background:var(--sys-surface-variant); border-radius:8px; padding:10px; margin-top:10px; width:100%; font-size:14px;" 
+                   placeholder="自定义图片 URL..." onchange="setBg(this.value)">
+        </div>
+
+        <div class="setting-group">
+            <div class="setting-title">高级</div>
+            <button class="full-btn ripple-btn" style="background:#B3261E; color:#fff;" onclick="clearCache()">
+                <span class="material-symbols-rounded">delete</span> 重置所有数据
+            </button>
+        </div>
+    </div>
+
+    <!-- 3. 浏览器界面 -->
+    <div id="browser-screen" class="screen hidden">
+        <div class="browser-top glass">
+            <button class="nav-icon ripple-btn" style="font-size:20px" onclick="closeBrowser()">
+                <span class="material-symbols-rounded">expand_more</span>
+            </button>
+            <div class="url-bar-ro">
+                <span class="material-symbols-rounded" style="font-size:14px; color:var(--sys-outline)">lock</span>
+                <span id="url-disp" style="max-width: 200px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">example.com</span>
+            </div>
+            <button class="nav-icon ripple-btn" style="font-size:20px" onclick="refreshPage()">
+                <span class="material-symbols-rounded">refresh</span>
+            </button>
+        </div>
+
+        <div class="browser-content">
+            <div class="loading-line" id="loading-bar"></div>
+            <iframe id="web-frame" style="width:100%; height:100%; border:none;" sandbox="allow-forms allow-scripts allow-same-origin allow-popups"></iframe>
+        </div>
+
+        <div class="browser-bottom glass">
+            <button class="nav-icon ripple-btn" onclick="navBack()"><span class="material-symbols-rounded">arrow_back</span></button>
+            <button class="nav-icon ripple-btn" onclick="navForward()"><span class="material-symbols-rounded">arrow_forward</span></button>
+            <button class="nav-icon ripple-btn" style="color:var(--app-primary)"><span class="material-symbols-rounded">add_box</span></button>
+            <button class="nav-icon ripple-btn" onclick="openExternal()"><span class="material-symbols-rounded">open_in_new</span></button>
+        </div>
+    </div>
+
+    <script>
+        /* --- 逻辑控制中心 --- */
+        const $ = id => document.getElementById(id);
+        const SEARCH_PREFIX = "https://cn.bing.com/search?q=";
+        const BING_BG_API = "https://bing.biturl.top/?resolution=1920&format=image&index=0&mkt=zh-CN";
+
+        // 状态
+        let currentUrl = "";
+
+        // 初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            updateTime();
+            loadPreferences();
+            
+            // 输入框回车监听
+            $('home-input').addEventListener('keypress', (e) => {
+                if(e.key === 'Enter') handleSearch();
+            });
+            $('home-go').addEventListener('click', handleSearch);
+        });
+
+        /* 1. 核心导航功能 */
+        function handleSearch() {
+            const val = $('home-input').value.trim();
+            if(!val) return;
+            
+            let url = val;
+            if (!val.includes('.') || val.includes(' ')) {
+                url = SEARCH_PREFIX + encodeURIComponent(val);
+            } else if (!val.startsWith('http')) {
+                url = 'https://' + val;
+            }
+            loadUrl(url);
+        }
+
+        function loadUrl(url) {
+            currentUrl = url;
+            $('home-screen').style.transform = "scale(0.95)"; // 首页微缩效果
+            $('home-screen').style.opacity = "0.5";
+            
+            const browser = $('browser-screen');
+            browser.classList.remove('hidden');
+            
+            // 稍微延迟添加 active 类以触发 slide-up 动画
+            setTimeout(() => {
+                browser.classList.add('active');
+            }, 10);
+
+            $('url-disp').innerText = new URL(url).hostname;
+            $('loading-bar').style.width = "30%";
+            
+            const frame = $('web-frame');
+            frame.src = url;
+            
+            frame.onload = () => {
+                $('loading-bar').style.width = "100%";
+                setTimeout(() => { $('loading-bar').style.width = "0"; }, 300);
+            };
+        }
+
+        function closeBrowser() {
+            const browser = $('browser-screen');
+            browser.classList.remove('active');
+            
+            $('home-screen').style.transform = "scale(1)";
+            $('home-screen').style.opacity = "1";
+
+            setTimeout(() => {
+                browser.classList.add('hidden');
+                $('web-frame').src = "about:blank"; // 停止资源占用
+            }, 350); // 等待动画结束
+        }
+
+        /* 2. 设置与面板控制 */
+        function openSettings() {
+            $('overlay').classList.add('active');
+            $('settings-sheet').classList.add('active');
+        }
+
+        function closeSettings() {
+            $('overlay').classList.remove('active');
+            $('settings-sheet').classList.remove('active');
+        }
+
+        /* 3. 个性化逻辑 */
+        function loadPreferences() {
+            // 暗黑模式
+            const isDark = localStorage.getItem('md3_dark') === 'true';
+            $('dark-mode-toggle').checked = isDark;
+            if(isDark) document.body.classList.add('dark-mode');
+
+            // 监听 Toggle
+            $('dark-mode-toggle').addEventListener('change', (e) => {
+                if(e.target.checked) document.body.classList.add('dark-mode');
+                else document.body.classList.remove('dark-mode');
+                localStorage.setItem('md3_dark', e.target.checked);
+            });
+
+            // 主题色
+            const theme = localStorage.getItem('md3_theme') || '#6750A4';
+            setTheme(theme);
+
+            // 背景
+            const bg = localStorage.getItem('md3_bg');
+            if(bg) {
+                document.body.style.backgroundImage = bg === 'none' ? 'none' : `url('${bg}')`;
+            } else {
+                setBg('bing'); // 默认
+            }
+        }
+
+        function setTheme(color, el) {
+            document.documentElement.style.setProperty('--app-primary', color);
+            document.documentElement.style.setProperty('--app-container', color + '22'); // 增加透明度作为容器色
+            document.documentElement.style.setProperty('--app-on-container', color);
+            localStorage.setItem('md3_theme', color);
+            
+            // UI选中反馈
+            document.querySelectorAll('.color-circle').forEach(c => c.classList.remove('selected'));
+            if(el) el.classList.add('selected');
+        }
+
+        function setBg(type) {
+            let url = 'none';
+            if(type === 'bing') url = BING_BG_API;
+            else if(type !== 'none') url = type; // 自定义URL
+            
+            if(url === 'none') {
+                document.body.style.backgroundImage = 'none';
+            } else {
+                document.body.style.backgroundImage = `url('${url}')`;
+            }
+            localStorage.setItem('md3_bg', url);
+        }
+
+        function clearCache() {
+            if(confirm('确定要重置所有设置吗？')) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        /* 4. 辅助功能 */
+        function updateTime() {
+            const now = new Date();
+            const hour = now.getHours();
+            let greet = "柠檬浏览器";
+            if(hour >= 12) greet = "柠檬浏览器";
+            if(hour >= 18) greet = "柠檬浏览器";
+            $('greeting-text').innerText = greet;
+
+            const options = { weekday: 'long', month: 'short', day: 'numeric' };
+            $('date-text').innerText = now.toLocaleDateString('en-US', options);
+        }
+
+        // 浏览器控制
+        function navBack() { try{ $('web-frame').contentWindow.history.back(); }catch(e){} }
+        function navForward() { try{ $('web-frame').contentWindow.history.forward(); }catch(e){} }
+        function refreshPage() { $('web-frame').contentWindow.location.reload(); }
+        function openExternal() { if(currentUrl) window.open(currentUrl, '_blank'); }
+
+    </script>
+</body>
+</html>
